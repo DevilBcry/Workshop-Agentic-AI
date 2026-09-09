@@ -9,4 +9,5 @@ export interface Env {
   OPENAI_COMPAT_MODEL?: string;
   OPENAI_COMPAT_API_KEY?: string;
   DEFAULT_CHAT_PROVIDER?: string;
+  ADMIN_TOKEN?: string;
 }

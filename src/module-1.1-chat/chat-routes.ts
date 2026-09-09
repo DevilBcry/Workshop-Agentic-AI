@@ -3,6 +3,7 @@ import { errorJson, json } from "../lib/http";
 import { runGeminiConversation } from "./providers/gemini";
 import { runOpenAiCompatConversation } from "./providers/openai-compat";
 import type { ChatMessage, ChatProvider, ChatTurnResult } from "./types";
+import { getEffectiveApiKey, getEffectiveBaseUrl } from "../module-1.2-key-settings/keys-store";
 
 const providers: ChatProvider[] = ["gemini", "openai", "openai-compat"];
 export function resolveProvider(value: unknown, env: Env): ChatProvider {
@@ -13,11 +14,12 @@ export function defaultModelFor(provider: ChatProvider, env: Env): string {
   return provider === "gemini" ? env.GEMINI_MODEL || "gemini-flash-latest" : provider === "openai" ? env.OPENAI_MODEL || "gpt-4o-mini" : env.OPENAI_COMPAT_MODEL || "gpt-4o-mini";
 }
 export function buildSystemPrompt(): string { return "คุณคือผู้ช่วย AI ของระบบ Workshop Agentic AI ตอบเป็นภาษาไทยอย่างสุภาพ กระชับ และตรงคำถาม"; }
-function resolveApiKey(provider: ChatProvider, env: Env): string | undefined { return provider === "gemini" ? env.GEMINI_API_KEY : provider === "openai" ? env.OPENAI_API_KEY : env.OPENAI_COMPAT_API_KEY; }
-function resolveBaseUrl(provider: ChatProvider): string | undefined { return provider === "openai" ? "https://api.openai.com/v1" : undefined; }
+async function resolveApiKey(provider: ChatProvider, env: Env): Promise<string | undefined> { return getEffectiveApiKey(env, provider); }
+async function resolveBaseUrl(provider: ChatProvider, env: Env): Promise<string | undefined> { return provider === "openai" ? "https://api.openai.com/v1" : provider === "openai-compat" ? getEffectiveBaseUrl(env) : undefined; }
 export async function runChatTurn(provider: ChatProvider, model: string, messages: ChatMessage[], env: Env): Promise<ChatTurnResult> {
-  if (provider === "gemini") return runGeminiConversation(resolveApiKey(provider, env), model, messages, buildSystemPrompt(), [], undefined);
-  return runOpenAiCompatConversation(provider === "openai" ? resolveBaseUrl(provider) : env.OPENAI_COMPAT_BASE_URL, resolveApiKey(provider, env), model, messages, buildSystemPrompt(), [], undefined);
+  const apiKey = await resolveApiKey(provider, env);
+  if (provider === "gemini") return runGeminiConversation(apiKey, model, messages, buildSystemPrompt(), [], undefined);
+  return runOpenAiCompatConversation(await resolveBaseUrl(provider, env), apiKey, model, messages, buildSystemPrompt(), [], undefined);
 }
 export async function handleChatRoute(request: Request, env: Env): Promise<Response> {
   if (request.method !== "POST") return errorJson("ต้องใช้ POST กับ /api/chat", 405);

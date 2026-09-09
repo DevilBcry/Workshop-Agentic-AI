@@ -24,6 +24,7 @@ export async function handleKeysRoute(request: Request, env: Env): Promise<Respo
     }
     if (request.method !== "POST") return errorJson("รองรับเฉพาะ GET, POST และ DELETE", 405);
     const input = await request.json() as { provider?: unknown; apiKey?: unknown; baseUrl?: unknown };
+    if (input.apiKey !== undefined && input.baseUrl !== undefined) return errorJson("กรุณาบันทึก apiKey หรือ baseUrl แยกกัน", 400);
     if (input.apiKey !== undefined) {
       if (!isChatProvider(input.provider) || typeof input.apiKey !== "string" || !input.apiKey.trim()) return errorJson("การตั้ง API key ต้องระบุ provider ที่ถูกต้องและ apiKey", 400);
       await setApiKey(env, input.provider, input.apiKey.trim());

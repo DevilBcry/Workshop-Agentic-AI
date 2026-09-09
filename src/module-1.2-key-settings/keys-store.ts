@@ -4,7 +4,15 @@ import type { ChatProvider } from "../module-1.1-chat/types";
 const PROVIDERS: ChatProvider[] = ["gemini", "openai", "openai-compat"];
 const keyName = (provider: ChatProvider) => `secret:${provider}_api_key`;
 function kv(env: Env): KVNamespace | undefined { return env.APP_KV; }
-function mask(value: string | undefined): string | undefined { return value ? `••••${value.slice(-4)}` : undefined; }
+function usableBaseUrl(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  if (!normalized || normalized.toLowerCase() === "replace base url") return undefined;
+  return normalized;
+}
+function mask(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  return value.length > 4 ? `••••${value.slice(-4)}` : "••••";
+}
 
 export async function getEffectiveApiKey(env: Env, provider: ChatProvider): Promise<string | undefined> {
   const stored = await kv(env)?.get(keyName(provider));
@@ -12,7 +20,7 @@ export async function getEffectiveApiKey(env: Env, provider: ChatProvider): Prom
   return provider === "gemini" ? env.GEMINI_API_KEY : provider === "openai" ? env.OPENAI_API_KEY : env.OPENAI_COMPAT_API_KEY;
 }
 export async function getEffectiveBaseUrl(env: Env): Promise<string | undefined> {
-  return (await kv(env)?.get("config:openai_compat_base_url")) || env.OPENAI_COMPAT_BASE_URL;
+  return usableBaseUrl((await kv(env)?.get("config:openai_compat_base_url")) || env.OPENAI_COMPAT_BASE_URL);
 }
 export async function getKeyStatuses(env: Env) {
   return Object.fromEntries(await Promise.all(PROVIDERS.map(async (provider) => {
@@ -24,7 +32,7 @@ export async function getKeyStatuses(env: Env) {
 }
 export async function getBaseUrlStatus(env: Env) {
   const stored = await kv(env)?.get("config:openai_compat_base_url");
-  const value = stored || env.OPENAI_COMPAT_BASE_URL;
+  const value = usableBaseUrl(stored || env.OPENAI_COMPAT_BASE_URL);
   return { configured: Boolean(value), source: stored ? "kv" : value ? "env" : undefined, maskedHint: value ? `${value.slice(0, 8)}…${value.slice(-12)}` : undefined };
 }
 async function requireKv(env: Env): Promise<KVNamespace> { if (!env.APP_KV) throw new Error("ยังไม่ได้ผูก APP_KV"); return env.APP_KV; }
